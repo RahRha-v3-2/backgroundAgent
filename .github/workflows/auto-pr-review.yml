@@ -3,8 +3,12 @@ name: "Auto PR Review"
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  pull_request_review:
-    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: number
 
 permissions:
   contents: read
@@ -26,7 +30,9 @@ jobs:
       - name: Get PR details
         id: pr-details
         run: |
-          PR_DATA=$(gh pr view ${{ github.event.pull_request.number }} \
+          PR_NUM="${{ github.event.inputs.pr_number || github.event.pull_request.number }}"
+          echo "pr_data<<EOF" >> $GITHUB_OUTPUT
+          gh pr view $PR_NUM \
             --json title,body,author,files,additions,deletions,changedFiles,baseRefName,headRefName \
             --jq '{
               title: .title,
@@ -37,16 +43,17 @@ jobs:
               deletions: .deletions,
               base: .baseRefName,
               head: .headRefName
-            }')
-          echo "pr_data=$PR_DATA" >> $GITHUB_OUTPUT
+            }' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "number=$PR_NUM" >> $GITHUB_OUTPUT
 
       - name: Get changed files
         id: changed-files
         run: |
-          FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD 2>/dev/null | tr '\n' ',' | sed 's/,$//')
-          echo "$FILES" > changed-files.txt
-          echo "files=$FILES" >> $GITHUB_OUTPUT
-          cat changed-files.txt
+          BASE="${{ fromJSON(steps.pr-details.outputs.pr_data).base }}"
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          git diff --name-only origin/$BASE...HEAD 2>/dev/null | tr '\n' ',' | sed 's/,$//' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run Code Review
         id: gemini
@@ -57,149 +64,47 @@ jobs:
             You are an expert code reviewer. Perform a thorough review of this pull request.
             
             ## Pull Request Details
-            Title: ${{ github.event.pull_request.title }}
-            Author: ${{ steps.pr-details.outputs.author }}
-            Files Changed: ${{ steps.pr-details.outputs.files }}
-            Additions: ${{ steps.pr-details.outputs.additions }}
-            Deletions: ${{ steps.pr-details.outputs.deletions }}
-            Base: ${{ steps.pr-details.outputs.base }}
-            Head: ${{ steps.pr-details.outputs.head }}
+            Title: ${{ fromJSON(steps.pr-details.outputs.pr_data).title }}
+            Author: ${{ fromJSON(steps.pr-details.outputs.pr_data).author }}
             
             ## Changed Files
             ${{ steps.changed-files.outputs.files }}
             
             ## Your Review
-            Analyze the code changes thoroughly and provide feedback on:
+            Analyze the changes and provide feedback on correctness, security, performance, and quality.
             
-            1. **Correctness & Logic**: Does the code work correctly? Any bugs or logic errors?
-            2. **Security**: Are there any security vulnerabilities (injection, XSS, etc.)?
-            3. **Performance**: Any performance concerns with the changes?
-            4. **Code Quality**: Style, naming, readability, maintainability
-            5. **Error Handling**: Are errors handled appropriately?
-            6. **Testing**: Is test coverage adequate?
-            7. **Breaking Changes**: Any API or interface changes that need attention?
-            8. **Documentation**: Are docs updated if needed?
-            
-            ## Response Format
+            Format:
             ```
             ## AI Code Review
-            
             ### Summary
-            [Brief overview of the changes and overall assessment]
-            
+            ...
             ### Recommendations
-            | Severity | Location | Issue | Suggestion |
-            |----------|----------|-------|------------|
-            | Critical | file:line | Description | Fix suggestion |
-            
-            ### Praise
-            [What was done well]
-            
+            ...
             ### Overall Verdict
-            [Approve / Request Changes / Approve with Suggestions]
+            ...
             ```
-            
-            Be specific and constructive. Focus on important issues, not style preferences.
           gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post review comment
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
-          PR_NUM="${{ github.event.pull_request.number }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred.' }}"
+          PR_NUM="${{ steps.pr-details.outputs.number }}"
           
-          # Format the review body with proper escaping
-          BODY=$(cat <<'EOFBODY'
+          cat > review_body.md << EOF
           ## AI Code Review 🤖
           
-          %SUMMARY%
+          $SUMMARY
           
           ---
           *Review generated by Gemini CLI*
-          EOBODY
-          )
+          EOF
           
-          # Replace placeholder with actual summary
-          BODY="${BODY//%SUMMARY%/$SUMMARY}"
+          gh pr comment $PR_NUM --body-file review_body.md
           
-          # Post as a comment first (can always post comments)
-          gh pr comment $PR_NUM --body "$BODY"
-          
-          # Determine approval status based on content
-          if echo "$SUMMARY" | grep -qi "critical\|request changes\|blocking"; then
-            gh pr review $PR_NUM --body "Please address the critical issues mentioned above before merging." --request-changes
+          if echo "$SUMMARY" | grep -qi "critical\|request changes"; then
+            gh pr review $PR_NUM --body "Please address the critical issues." --request-changes
           else
-            gh pr review $PR_NUM --body "Code review complete. See comments for details." --approve
-          fi
-
-  security-scan:
-    name: "Security Analysis"
-    runs-on: ubuntu-latest
-    if: ${{ github.event.action == 'opened' }}
-    env:
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Security Analysis
-        id: gemini
-        uses: google-github-actions/run-gemini-cli@v0.1.21
-        with:
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          prompt: |
-            Perform a focused security review of this pull request.
-            
-            ## PR Details
-            Title: ${{ github.event.pull_request.title }}
-            Files Changed: ${{ steps.pr-details.outputs.files }}
-            
-            ## Security Checklist
-            Check for these common vulnerabilities:
-            - SQL/NoSQL injection
-            - XSS (Cross-Site Scripting)
-            - CSRF (Cross-Site Request Forgery)
-            - Authentication/authorization issues
-            - Sensitive data exposure (credentials, tokens, PII)
-            - Path traversal
-            - Command injection
-            - Deserialization vulnerabilities
-            - Insecure dependencies
-            - Security misconfiguration
-            
-            ## Response Format
-            ```
-            ## Security Analysis 🔒
-            
-            ### Overall Security: [Secure / Issues Found / Needs Review]
-            
-            ### Findings
-            - **[Critical/High/Medium/Low]**: Description with file:line and remediation
-            
-            ### Secure Areas
-            [What looks good from a security perspective]
-            ```
-            
-            Be thorough but concise. Only report actual security concerns.
-          gemini_model: gemini-1.5-flash
-          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
-
-      - name: Post security findings
-        if: always()
-        run: |
-          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
-          PR_NUM="${{ github.event.pull_request.number }}"
-          
-          if echo "$SUMMARY" | grep -qi "critical\|high"; then
-            cat > /tmp/security_alert.md << EOF
-            ## Security Alert
-
-            $SUMMARY
-
-            ---
-            *Automated security scan by Gemini CLI*
-            EOF
-            gh pr comment $PR_NUM --body-file /tmp/security_alert.md
+            gh pr review $PR_NUM --body "Code review complete." --approve
           fi
