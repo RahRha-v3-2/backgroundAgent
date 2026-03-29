@@ -1,0 +1,190 @@
+name: "CI Doctor"
+
+on:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+    branches:
+      - main
+      - master
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  diagnose-failures:
+    name: "Diagnose CI Failures"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get failed workflow run details
+        id: run-details
+        run: |
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          
+          echo "## Failed Workflow Analysis" > failure-analysis.md
+          echo "**Workflow**: ${{ github.event.workflow_run.name }}" >> failure-analysis.md
+          echo "**Run ID**: $RUN_ID" >> failure-analysis.md
+          echo "**Triggered by**: ${{ github.event.workflow_run.actor.login }}" >> failure-analysis.md
+          echo "" >> failure-analysis.md
+          
+          # Get jobs and their statuses
+          gh api repos/${{ github.repository }}/actions/runs/$RUN_ID/jobs \
+            --jq '.jobs[] | select(.conclusion == "failure") | {
+              name: .name,
+              conclusion: .conclusion,
+              html_url: .html_url,
+              started_at: .started_at
+            }' >> failure-analysis.md
+
+      - name: Get workflow logs
+        id: logs
+        run: |
+          gh run view ${{ github.event.workflow_run.id }} --log-failed 2>/dev/null | head -500 > failed-logs.txt || echo "No logs available" > failed-logs.txt
+          cat failed-logs.txt
+
+      - name: Run Diagnosis
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            You are an expert DevOps engineer. Diagnose this CI/CD failure.
+            
+            ## Failed Workflow
+            Name: ${{ github.event.workflow_run.name }}
+            Run ID: ${{ github.event.workflow_run.id }}
+            
+            ## Error Logs
+            ```
+            ${{ steps.logs.outputs.logs || 'No logs available' }}
+            ```
+            
+            ## Your Task
+            1. Identify the root cause of the failure
+            2. Analyze the error messages and stack traces
+            3. Look for common patterns (dependency issues, syntax errors, permission issues, etc.)
+            4. Provide a clear explanation of what went wrong
+            5. Suggest a specific fix with code if possible
+            
+            ## Response Format
+            ```
+            ## CI Failure Diagnosis 🔬
+            
+            ### Root Cause
+            [Clear explanation of what failed]
+            
+            ### Error Analysis
+            [Detailed analysis of error messages]
+            
+            ### Suggested Fix
+            ```[language]
+            [fix code if applicable]
+            ```
+            
+            ### Prevention
+            [How to prevent this in the future]
+            ```
+            
+            Be specific and actionable. Don't guess - if you can't determine the cause, say so.
+          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2, "maxOutputTokens": 8192}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Create diagnostic issue
+        if: always()
+        run: |
+          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          LOGS="${{ steps.logs.outputs.logs }}"
+          
+          # Create an issue with the diagnosis
+          gh issue create \
+            --title "CI Failure: ${{ github.event.workflow_run.name }} - $(date +'%Y-%m-%d')" \
+            --body "## CI Failure Report
+
+### Workflow: ${{ github.event.workflow_run.name }}
+### Run: ${{ github.event.workflow_run.html_url }}
+
+$SUMMARY
+
+### Failed Job Logs
+\`\`\`
+${LOGS:0:3000}
+\`\`\`
+
+---
+*Automated diagnosis by CI Doctor* " \
+            --label "ci-failure,automated,needs-attention"
+
+      - name: Add diagnostic comment to relevant PR
+        if: ${{ github.event.workflow_run.event == 'pull_request' }}
+        run: |
+          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          PR_NUM="${{ github.event.workflow_run.pull_requests[0].number }}"
+          
+          if [ -n "$PR_NUM" ]; then
+            gh pr comment $PR_NUM --body "## CI Failure Analysis 🔬
+
+$SUMMARY
+
+**Workflow Run**: ${{ github.event.workflow_run.html_url }}
+
+---
+*Automated diagnosis by CI Doctor*"
+          fi
+
+  nightly-health-check:
+    name: "Nightly CI Health Check"
+    runs-on: ubuntu-latest
+    schedule:
+      - cron: "0 2 * * *" # Run at 2 AM UTC
+    steps:
+      - name: Check recent workflow runs
+        run: |
+          echo "## Recent Workflow Runs (Last 24h)" > health-report.md
+          echo "" >> health-report.md
+          
+          gh run list \
+            --limit 20 \
+            --json name,status,conclusion,startedAt,duration \
+            --jq '.[] | "- \(.name): \(.conclusion // .status) (started: \(.startedAt))"' >> health-report.md
+          
+          cat health-report.md
+
+      - name: Analyze patterns
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            Analyze these recent CI/CD workflow runs and identify any patterns or concerns.
+            
+            ## Recent Workflow Runs
+            ${{ steps.health-check.outputs.report }}
+            
+            ## Your Task
+            1. Identify any recurring failures
+            2. Note workflow performance trends
+            3. Suggest improvements
+            4. Flag any concerning patterns
+            
+            Keep it brief and actionable.
+          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.3}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Post health report
+        if: always()
+        run: |
+          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          
+          gh issue create \
+            --title "CI Health Report - $(date +'%Y-%m-%d')" \
+            --body "$SUMMARY" \
+            --label "ci-health,automated,report"
