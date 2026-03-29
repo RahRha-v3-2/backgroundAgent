@@ -23,6 +23,8 @@ jobs:
     outputs:
       command: ${{ steps.parse.outputs.command }}
       target: ${{ steps.parse.outputs.target }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -69,6 +71,8 @@ jobs:
     name: "Help Command"
     runs-on: ubuntu-latest
     if: needs.dispatch.outputs.command == 'help'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Show help
         run: |
@@ -82,6 +86,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: dispatch
     if: needs.dispatch.outputs.command == 'assist' || needs.dispatch.outputs.command == 'explain'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -124,6 +130,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: dispatch
     if: needs.dispatch.outputs.command == 'implement' && needs.dispatch.outputs.target == 'code'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -173,6 +181,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: dispatch
     if: needs.dispatch.outputs.command == 'triage' && needs.dispatch.outputs.target == 'issue'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
 
@@ -240,6 +250,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: dispatch
     if: needs.dispatch.outputs.command == 'review' && needs.dispatch.outputs.target == 'pr'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -304,6 +316,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: dispatch
     if: needs.dispatch.outputs.command == 'document' && needs.dispatch.outputs.target == 'doc'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -347,6 +361,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: dispatch
     if: needs.dispatch.outputs.command == 'debug' && needs.dispatch.outputs.target == 'ci'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:

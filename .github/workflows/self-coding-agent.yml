@@ -26,6 +26,8 @@ jobs:
     name: "Implement Feature from Issue"
     runs-on: ubuntu-latest
     if: ${{ github.event.issue.number == github.event.inputs.issue_number || contains(github.event.comment.body, '/implement') || contains(github.event.comment.body, '/fix') }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -172,6 +174,8 @@ jobs:
     name: "Fix Bug from Issue"
     runs-on: ubuntu-latest
     if: contains(github.event.comment.body, '/fix')
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:

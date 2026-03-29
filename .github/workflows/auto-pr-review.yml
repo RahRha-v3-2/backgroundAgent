@@ -16,6 +16,8 @@ jobs:
   review-pr:
     name: "AI Code Review"
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -133,6 +135,8 @@ jobs:
     name: "Security Analysis"
     runs-on: ubuntu-latest
     if: ${{ github.event.action == 'opened' }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:

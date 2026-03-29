@@ -40,6 +40,8 @@ jobs:
     name: "Sync README with Code"
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,6 +112,8 @@ jobs:
     name: "Generate API Documentation"
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -171,6 +175,8 @@ jobs:
     name: "Generate Changelog"
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged == true
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:

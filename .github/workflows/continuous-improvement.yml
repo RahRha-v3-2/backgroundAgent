@@ -14,6 +14,8 @@ jobs:
   code-simplification:
     name: "Code Simplification Analysis"
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,6 +95,8 @@ jobs:
   test-coverage-analysis:
     name: "Test Coverage Analysis"
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,6 +155,8 @@ jobs:
   dependency-review:
     name: "Dependency Health Check"
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check dependencies
         run: |

@@ -24,6 +24,8 @@ jobs:
     name: "Diagnose CI Failures"
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -158,6 +160,8 @@ jobs:
     name: "Nightly CI Health Check"
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check recent workflow runs
         run: |
