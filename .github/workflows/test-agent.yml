@@ -131,17 +131,12 @@ jobs:
           gh issue edit $TEST_ISSUE --add-label "priority: high,bug,authentication"
           
           # Add triage comment
-          gh issue comment $TEST_ISSUE --body "## 🔍 Triage Complete
-
-$SUMMARY
-
----
-*Automated triage test*"
+          gh issue comment $TEST_ISSUE --body "Triage complete. Summary: $SUMMARY"
           
           # Close test issue
           gh issue close $TEST_ISSUE --reason "completed"
           
-          echo "✅ Triage test complete"
+          echo "Triage test complete"
 
   review-test:
     name: "Test Code Review"
@@ -155,19 +150,7 @@ $SUMMARY
       - name: Create test file
         run: |
           mkdir -p test-dir
-          cat > test-dir/example.js << 'EOF'
-// Example code for review test
-function calculateTotal(items, taxRate) {
-  let total = 0;
-  for (let i = 0; i < items.length; i++) {
-    total += items[i].price;
-  }
-  total = total * (1 + taxRate);
-  return total;
-}
-
-module.exports = { calculateTotal };
-EOF
+          echo 'function calculateTotal(items, taxRate) { let total = 0; for (let i = 0; i < items.length; i++) { total += items[i].price; } total = total * (1 + taxRate); return total; } module.exports = { calculateTotal };' > test-dir/example.js
 
       - name: Run Review
         uses: google-github-actions/run-gemini-cli@v0.1.21
