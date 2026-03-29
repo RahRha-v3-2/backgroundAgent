@@ -133,7 +133,7 @@ jobs:
           gh issue create \
             --title "CI Failure: $WORKFLOW_NAME - $(date +'%Y-%m-%d')" \
             --body "$(cat /tmp/issue_body.md)" \
-            --label "ci-failure,automated,needs-attention"
+            --label "automated,needs-attention"
 
       - name: Add diagnostic comment to relevant PR
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
