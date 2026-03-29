@@ -76,7 +76,7 @@ jobs:
             ```
             
             Focus on impactful changes that improve maintainability.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 8192}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create improvement report
@@ -136,7 +136,7 @@ jobs:
             ```
             
             Be specific about what should be tested and why.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.4}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post recommendations
@@ -214,7 +214,7 @@ jobs:
             ### Optimization Opportunities
             [Heavy or unnecessary dependencies]
             ```
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.3}'
+          gemini_model: gemini-2.5-flash-lite
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post dependency report

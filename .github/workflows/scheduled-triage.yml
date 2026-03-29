@@ -59,7 +59,7 @@ jobs:
             - Issues that could be closed as duplicates or invalid
             
             Format your response clearly with sections for each category.
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.4, "maxOutputTokens": 8192}'
+          gemini_model: gemini-2.5-flash-lite
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create triage report

@@ -112,7 +112,7 @@ jobs:
             If this is a code explanation request, analyze the relevant files and provide a clear explanation.
             
             Respond concisely but thoroughly.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.7}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post response
@@ -167,7 +167,7 @@ jobs:
             - Update documentation if needed
             
             If you cannot complete the implementation, create a detailed analysis of what needs to be done.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Update issue status
@@ -215,7 +215,7 @@ jobs:
             - **Suggested Labels**: [comma-separated labels]
             - **Notes**: [any additional observations]
             ```
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.5}'
+          gemini_model: gemini-2.5-flash-lite
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Apply triage results
@@ -295,7 +295,7 @@ jobs:
             ```
             
             Be thorough but constructive. Focus on important issues.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post review
@@ -347,7 +347,7 @@ jobs:
             - Update related files (changelog, API docs, etc.)
             
             If changes are needed, create a branch and PR with the documentation updates.
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.4}'
+          gemini_model: gemini-2.5-flash-lite
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Notify completion
@@ -393,7 +393,7 @@ jobs:
             5. Suggest a fix with code if applicable
             
             Be specific and actionable in your diagnosis.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post diagnosis

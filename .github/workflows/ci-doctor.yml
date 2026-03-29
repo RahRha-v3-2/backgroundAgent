@@ -100,7 +100,7 @@ jobs:
             ```
             
             Be specific and actionable. Don't guess - if you can't determine the cause, say so.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2, "maxOutputTokens": 8192}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create diagnostic issue
@@ -196,7 +196,7 @@ jobs:
             4. Flag any concerning patterns
             
             Keep it brief and actionable.
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.3}'
+          gemini_model: gemini-2.5-flash-lite
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post health report

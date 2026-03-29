@@ -118,7 +118,7 @@ jobs:
             Create all necessary files and modifications. Be thorough but focused.
             
             If the issue is unclear or you need more information, create a detailed question as a comment on the issue.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 16384}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Verify implementation
@@ -220,7 +220,7 @@ jobs:
             - Include comments explaining the fix
             
             Provide the fix with clear explanation of what was wrong and how it's fixed.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create PR with fix

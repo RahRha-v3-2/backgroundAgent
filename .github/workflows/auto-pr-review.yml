@@ -99,7 +99,7 @@ jobs:
             ```
             
             Be specific and constructive. Focus on important issues, not style preferences.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 8192}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post review comment
@@ -181,7 +181,7 @@ jobs:
             ```
             
             Be thorough but concise. Only report actual security concerns.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2, "maxOutputTokens": 4096}'
+          gemini_model: gemini-2.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post security findings
