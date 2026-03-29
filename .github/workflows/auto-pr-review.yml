@@ -186,10 +186,13 @@ jobs:
           PR_NUM="${{ github.event.pull_request.number }}"
           
           if echo "$SUMMARY" | grep -qi "critical\|high"; then
-            gh pr comment $PR_NUM --body "## Security Alert ⚠️
+            cat > /tmp/security_alert.md << EOF
+            ## Security Alert
 
-$SUMMARY
+            $SUMMARY
 
----
-*Automated security scan by Gemini CLI*"
+            ---
+            *Automated security scan by Gemini CLI*
+            EOF
+            gh pr comment $PR_NUM --body-file /tmp/security_alert.md
           fi
