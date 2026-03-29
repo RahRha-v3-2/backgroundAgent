@@ -81,19 +81,22 @@ jobs:
 
       - name: Create test issue
         run: |
+          cat > /tmp/test_issue_body.md << 'ISSUEMARKER'
+          ## Bug Description
+          When users try to login with Google OAuth, they get a 403 error.
+
+          ## Steps to Reproduce
+          1. Go to login page
+          2. Click 'Login with Google'
+          3. Select account
+          4. See 403 error
+
+          ## Expected
+          User should be logged in successfully.
+          ISSUEMARKER
           TEST_ISSUE=$(gh issue create \
             --title "Test Issue: Login Bug - Users cannot authenticate" \
-            --body "## Bug Description
-When users try to login with Google OAuth, they get a 403 error.
-
-## Steps to Reproduce
-1. Go to login page
-2. Click 'Login with Google'
-3. Select account
-4. See 403 error
-
-## Expected
-User should be logged in successfully." \
+            --body "$(cat /tmp/test_issue_body.md)" \
             --label "test,bug")
           
           echo "Created test issue: $TEST_ISSUE"
