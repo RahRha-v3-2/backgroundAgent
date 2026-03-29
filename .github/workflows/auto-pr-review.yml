@@ -43,9 +43,10 @@ jobs:
       - name: Get changed files
         id: changed-files
         run: |
-          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD > changed-files.txt
+          FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+          echo "$FILES" > changed-files.txt
+          echo "files=$FILES" >> $GITHUB_OUTPUT
           cat changed-files.txt
-          echo "files=$(cat changed-files.txt | tr '\n' ',')" >> $GITHUB_OUTPUT
 
       - name: Run Code Review
         uses: google-github-actions/run-gemini-cli@v0.1.21

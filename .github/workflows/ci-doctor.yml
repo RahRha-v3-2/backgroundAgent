@@ -164,14 +164,18 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check recent workflow runs
+        id: health-check
         run: |
           echo "## Recent Workflow Runs (Last 24h)" > health-report.md
           echo "" >> health-report.md
           
-          gh run list \
+          REPORT=$(gh run list \
             --limit 20 \
             --json name,status,conclusion,startedAt,duration \
-            --jq '.[] | "- \(.name): \(.conclusion // .status) (started: \(.startedAt))"' >> health-report.md
+            --jq '.[] | "- \(.name): \(.conclusion // .status) (started: \(.startedAt))"' 2>/dev/null || echo "No runs found")
+          
+          echo "$REPORT" >> health-report.md
+          echo "report=$REPORT" >> $GITHUB_OUTPUT
           
           cat health-report.md
 

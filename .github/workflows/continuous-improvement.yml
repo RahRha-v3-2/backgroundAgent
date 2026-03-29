@@ -22,12 +22,16 @@ jobs:
           fetch-depth: 0
 
       - name: Find largest files
+        id: analyze
         run: |
-          find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" \) \
+          LARGE_FILES=$(find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" \) \
             -not -path "./node_modules/*" \
             -not -path "./vendor/*" \
             -not -path "./.git/*" \
-            -exec wc -l {} + | sort -rn | head -20 > large-files.txt
+            -exec wc -l {} + 2>/dev/null | sort -rn | head -20)
+          
+          echo "$LARGE_FILES" > large-files.txt
+          echo "large_files=$LARGE_FILES" >> $GITHUB_OUTPUT
           
           cat large-files.txt
 
@@ -159,18 +163,25 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check dependencies
+        id: deps
         run: |
+          DEPS=""
           if [ -f "package.json" ]; then
-            npm list --depth=0 > dependencies.txt
+            DEPS=$(npm list --depth=0 2>/dev/null || echo "No dependencies")
           elif [ -f "requirements.txt" ]; then
-            pip list > dependencies.txt 2>/dev/null || echo "pip not available"
+            DEPS=$(pip list 2>/dev/null || echo "pip not available")
           elif [ -f "go.mod" ]; then
-            go list -m all > dependencies.txt
+            DEPS=$(go list -m all 2>/dev/null || echo "No dependencies")
           elif [ -f "Cargo.toml" ]; then
-            cargo tree --depth 1 > dependencies.txt 2>/dev/null || echo "cargo tree not available"
+            DEPS=$(cargo tree --depth 1 2>/dev/null || echo "cargo tree not available")
+          else
+            DEPS="No dependency file found"
           fi
           
-          cat dependencies.txt 2>/dev/null || echo "No dependency file found"
+          echo "$DEPS" > dependencies.txt
+          echo "dependencies=$DEPS" >> $GITHUB_OUTPUT
+          
+          cat dependencies.txt
 
       - name: Analyze dependencies
         uses: google-github-actions/run-gemini-cli@v0.1.21

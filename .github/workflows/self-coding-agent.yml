@@ -40,7 +40,7 @@ jobs:
           ISSUE_NUM="${{ github.event.inputs.issue_number || github.event.issue.number }}"
           echo "Implementing from issue $ISSUE_NUM"
           
-          gh issue view $ISSUE_NUM \
+          DETAILS=$(gh issue view $ISSUE_NUM \
             --json number,title,body,labels,assignees \
             --jq '{
               number: .number,
@@ -48,24 +48,31 @@ jobs:
               body: .body,
               labels: [.labels[].name],
               assignees: [.assignees[].login]
-            }' > issue_details.json
+            }')
+          
+          echo "details=$DETAILS" >> $GITHUB_OUTPUT
+          echo "$DETAILS" > issue_details.json
           
           cat issue_details.json
 
       - name: Analyze codebase structure
+        id: analyze
         run: |
-          echo "## Codebase Structure" >> analysis.md
-          find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" -o -name "*.cs" \) \
+          ANALYSIS=""
+          ANALYSIS="$ANALYSIS\n## Codebase Structure\n"
+          ANALYSIS="$ANALYSIS$(find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" -o -name "*.cs" \) \
             -not -path "./node_modules/*" \
             -not -path "./vendor/*" \
             -not -path "./.git/*" \
-            | head -50 >> analysis.md
+            | head -50 2>/dev/null)"
           
-          echo "" >> analysis.md
-          echo "## Main Entry Points" >> analysis.md
+          ANALYSIS="$ANALYSIS\n\n## Main Entry Points\n"
           for f in main.* index.* app.* src/*; do
-            if [ -f "$f" ]; then echo "- $f"; fi
-          done >> analysis.md
+            if [ -f "$f" ]; then ANALYSIS="$ANALYSIS- $f\n"; fi
+          done
+          
+          echo "$ANALYSIS" > analysis.md
+          echo "analysis=$ANALYSIS" >> $GITHUB_OUTPUT
           
           cat analysis.md
 

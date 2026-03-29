@@ -49,9 +49,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Analyze code changes
+        id: analyze
         run: |
-          # Get files changed in the PR
-          git diff --name-only origin/main...HEAD > changed-files.txt || git diff --name-only origin/master...HEAD > changed-files.txt
+          FILES=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only origin/master...HEAD 2>/dev/null || echo "")
+          echo "$FILES" > changed-files.txt
+          echo "files=$FILES" >> $GITHUB_OUTPUT
           cat changed-files.txt
 
       - name: Run Documentation Sync
@@ -184,8 +186,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Analyze changes
+        id: analyze
         run: |
-          git log --oneline -20 > commits.txt
+          COMMITS=$(git log --oneline -20 2>/dev/null || echo "No commits")
+          echo "$COMMITS" > commits.txt
+          echo "commits=$COMMITS" >> $GITHUB_OUTPUT
           cat commits.txt
 
       - name: Generate changelog
