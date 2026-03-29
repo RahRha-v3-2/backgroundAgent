@@ -3,11 +3,6 @@ name: "Self-Coding Agent"
 on:
   issue_comment:
     types: [created, edited]
-    patterns:
-      - "/implement"
-      - "/fix"
-      - "/build"
-      - "/create"
   workflow_dispatch:
     inputs:
       issue_number:
