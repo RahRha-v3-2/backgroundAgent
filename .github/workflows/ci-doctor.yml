@@ -106,18 +106,18 @@ jobs:
           LOGS="${{ steps.logs.outputs.logs }}"
           
           # Create an issue with the diagnosis
-          cat > /tmp/issue_body.md << 'EOF'
+          cat > /tmp/issue_body.md << EOF
           ## CI Failure Report
 
-          ### Workflow: ${{ github.event.workflow_run.name }}
-          ### Run: ${{ github.event.workflow_run.html_url }}
+          ### Workflow: \${{ github.event.workflow_run.name }}
+          ### Run: \${{ github.event.workflow_run.html_url }}
 
-          $SUMMARY
+          \$SUMMARY
 
           ### Failed Job Logs
-          ```
-          ${LOGS:0:3000}
-          ```
+          \`\`\`
+          \${LOGS:0:3000}
+          \`\`\`
 
           ---
           *Automated diagnosis by CI Doctor*
@@ -125,7 +125,6 @@ jobs:
           gh issue create \
             --title "CI Failure: ${{ github.event.workflow_run.name }} - $(date +'%Y-%m-%d')" \
             --body-file /tmp/issue_body.md \
-            --label "ci-failure,automated,needs-attention"
             --label "ci-failure,automated,needs-attention"
 
       - name: Add diagnostic comment to relevant PR
@@ -135,14 +134,17 @@ jobs:
           PR_NUM="${{ github.event.workflow_run.pull_requests[0].number }}"
           
           if [ -n "$PR_NUM" ]; then
-            gh pr comment $PR_NUM --body "## CI Failure Analysis 🔬
+            cat > /tmp/pr_comment.md << EOF
+            ## CI Failure Analysis
 
-$SUMMARY
+            \$SUMMARY
 
-**Workflow Run**: ${{ github.event.workflow_run.html_url }}
+            **Workflow Run**: \${{ github.event.workflow_run.html_url }}
 
----
-*Automated diagnosis by CI Doctor*"
+            ---
+            *Automated diagnosis by CI Doctor*
+            EOF
+            gh pr comment $PR_NUM --body-file /tmp/pr_comment.md
           fi
 
   nightly-health-check:
