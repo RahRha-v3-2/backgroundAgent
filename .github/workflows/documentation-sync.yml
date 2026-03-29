@@ -80,7 +80,7 @@ jobs:
             - Mark new features clearly
             
             If no changes are needed to the README, say so clearly.
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.4}}'
+          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.4}'
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create PR with documentation updates
@@ -155,7 +155,7 @@ Automated documentation sync by Gemini CLI" \
             4. Output in markdown format suitable for API documentation
             
             Be thorough and include practical examples.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 16384}}'
+          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 16384}'
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Save documentation
@@ -225,7 +225,7 @@ $SUMMARY" \
             ```
             
             Categorize the changes appropriately.
-          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.3}}'
+          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.3}'
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Update changelog

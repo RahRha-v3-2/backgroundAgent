@@ -241,7 +241,7 @@ Please review the changes and let me know if any adjustments are needed."
             - Include comments explaining the fix
             
             Provide the fix with clear explanation of what was wrong and how it's fixed.
-          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2}}'
+          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2}'
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create PR with fix
