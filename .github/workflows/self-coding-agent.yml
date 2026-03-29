@@ -1,0 +1,288 @@
+name: "Self-Coding Agent"
+
+on:
+  issue_comment:
+    types: [created, edited]
+    patterns:
+      - "/implement"
+      - "/fix"
+      - "/build"
+      - "/create"
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to implement"
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  implement-feature:
+    name: "Implement Feature from Issue"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.issue.number == github.event.inputs.issue_number || contains(github.event.comment.body, '/implement') || contains(github.event.comment.body, '/fix') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read issue details
+        id: issue
+        run: |
+          ISSUE_NUM="${{ github.event.inputs.issue_number || github.event.issue.number }}"
+          echo "Implementing from issue #$ISSUE_NUM"
+          
+          gh issue view $ISSUE_NUM \
+            --json number,title,body,labels,assignees \
+            --jq '{
+              number: .number,
+              title: .title,
+              body: .body,
+              labels: [.labels[].name],
+              assignees: [.assignees[].login]
+            }' > issue_details.json
+          
+          cat issue_details.json
+
+      - name: Analyze codebase structure
+        run: |
+          echo "## Codebase Structure" >> analysis.md
+          find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" -o -name "*.cs" \) \
+            -not -path "./node_modules/*" \
+            -not -path "./vendor/*" \
+            -not -path "./.git/*" \
+            | head -50 >> analysis.md
+          
+          echo "" >> analysis.md
+          echo "## Main Entry Points" >> analysis.md
+          for f in main.* index.* app.* src/*; do
+            if [ -f "$f" ]; then echo "- $f"; fi
+          done >> analysis.md
+          
+          cat analysis.md
+
+      - name: Create feature branch
+        run: |
+          ISSUE_NUM="${{ github.event.inputs.issue_number || github.event.issue.number }}"
+          BRANCH_NAME="feature/issue-$ISSUE_NUM"
+          
+          git config user.name "Gemini CLI"
+          git config user.email "gemini-cli@github-actions[bot].com"
+          
+          git checkout -b $BRANCH_NAME
+          echo "Created branch: $BRANCH_NAME"
+
+      - name: Implement the solution
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            You are an expert software engineer. Implement the feature/fix described in this issue.
+            
+            ## Issue Details
+            Title: ${{ fromJSON(steps.issue.outputs.details).title }}
+            Number: ${{ steps.issue.outputs.number }}
+            Description:
+            ${{ fromJSON(steps.issue.outputs.details).body }}
+            
+            ## Codebase Analysis
+            ${{ steps.analyze.outputs.analysis }}
+            
+            ## Your Implementation Plan
+            1. First, understand the existing codebase patterns
+            2. Read relevant existing code to understand the style and conventions
+            3. Read GEMINI.md for project-specific guidelines
+            4. Implement the solution following existing patterns
+            5. Write/update tests
+            6. Ensure the code is clean and maintainable
+            
+            ## Important Guidelines
+            - Follow existing code style and conventions exactly
+            - Use meaningful variable and function names
+            - Add appropriate error handling
+            - Include comments for complex logic
+            - Write tests for new functionality
+            - Keep the implementation focused on the issue
+            
+            ## Output
+            Create all necessary files and modifications. Be thorough but focused.
+            
+            If the issue is unclear or you need more information, create a detailed question as a comment on the issue.
+          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 16384}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Verify implementation
+        run: |
+          echo "Checking for changes..."
+          git status
+          
+          # Run basic linting if available
+          if [ -f "package.json" ]; then
+            npm run lint --if-present || echo "Linting not configured"
+          fi
+          
+          # Try to run tests
+          if [ -f "package.json" ]; then
+            npm test --if-present || echo "Tests not available"
+          elif [ -f "pytest.ini" ] || [ -f "pyproject.toml" ]; then
+            python -m pytest --version || echo "pytest not available"
+          fi
+
+      - name: Create pull request
+        if: always()
+        run: |
+          ISSUE_NUM="${{ github.event.inputs.issue_number || github.event.issue.number }}"
+          
+          # Check if there are changes to commit
+          if git diff --quiet HEAD; then
+            echo "No changes to commit - implementation complete or not possible"
+            gh issue comment $ISSUE_NUM --body "## Implementation Status
+
+No code changes were generated. This could mean:
+- The issue needs clarification
+- The implementation requires manual intervention
+- The issue is not actionable as described
+
+Please review the issue and provide more details if needed."
+          else
+            git add -A
+            git commit -m "feat: implement solution for issue #$ISSUE_NUM
+
+Implemented feature/fix based on issue description.
+
+Issue: ${{ fromJSON(steps.issue.outputs.details).title }}
+Generated by Gemini CLI"
+            
+            git push -u origin feature/issue-$ISSUE_NUM
+            
+            gh pr create \
+              --title "feat: implement issue #$ISSUE_NUM" \
+              --body "## Implementation of Issue #$ISSUE_NUM
+
+${{ fromJSON(steps.issue.outputs.details).body }}
+
+## Changes Made
+- Implemented the requested feature/fix
+- Added/updating tests
+- Follows existing code patterns
+
+## Verification
+- [ ] Code follows project style guidelines
+- [ ] Tests added/updated
+- [ ] Documentation updated if needed
+
+---
+*Generated by Gemini CLI* " \
+              --base main || gh pr create \
+              --title "feat: implement issue #$ISSUE_NUM" \
+              --body "Implementation of issue #$ISSUE_NUM
+
+---
+*Generated by Gemini CLI* " \
+              --base master
+            
+            # Link PR to issue
+            gh issue comment $ISSUE_NUM --body "## Implementation Started
+
+I've implemented a solution and created PR: $(gh pr view --json url --jq .url)
+
+Please review the changes and let me know if any adjustments are needed."
+          fi
+
+  fix-bug:
+    name: "Fix Bug from Issue"
+    runs-on: ubuntu-latest
+    if: contains(github.event.comment.body, '/fix')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create fix branch
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          BRANCH_NAME="fix/issue-$ISSUE_NUM"
+          
+          git config user.name "Gemini CLI"
+          git config user.email "gemini-cli@github-actions[bot].com"
+          
+          git checkout -b $BRANCH_NAME
+          echo "Created branch: $BRANCH_NAME"
+
+      - name: Diagnose and fix
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            You are an expert debugging engineer. Diagnose and fix the bug described in this issue.
+            
+            ## Issue
+            Title: ${{ github.event.issue.title }}
+            Body: ${{ github.event.issue.body }}
+            
+            ## Your Task
+            1. Understand the expected vs actual behavior
+            2. Search the codebase for relevant code
+            3. Identify the root cause of the bug
+            4. Implement a fix
+            5. Write a test to prevent regression
+            
+            ## Guidelines
+            - Focus on the root cause, not just symptoms
+            - Write the simplest fix that solves the problem
+            - Add regression tests
+            - Include comments explaining the fix
+            
+            Provide the fix with clear explanation of what was wrong and how it's fixed.
+          settings: '{"model": "gemini-2.5-flash", "temperature": 0.2}}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Create PR with fix
+        if: always()
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          
+          if git diff --quiet HEAD; then
+            echo "No changes to commit"
+          else
+            git add -A
+            git commit -m "fix: resolve issue #$ISSUE_NUM
+
+Bug fix with regression test.
+
+Issue: ${{ github.event.issue.title }}
+Generated by Gemini CLI"
+            
+            git push -u origin fix/issue-$ISSUE_NUM
+            
+            gh pr create \
+              --title "fix: resolve issue #$ISSUE_NUM" \
+              --body "## Bug Fix for Issue #$ISSUE_NUM
+
+${{ github.event.issue.body }}
+
+## Root Cause
+[Analysis of the bug]
+
+## Fix
+[Description of the fix]
+
+## Testing
+- [ ] Added regression test
+- [ ] Existing tests still pass
+
+---
+*Generated by Gemini CLI* " \
+              --base main
+            
+            gh issue comment $ISSUE_NUM --body "## Bug Fix Ready
+
+I've identified and fixed the bug. Please review the PR."
+          fi

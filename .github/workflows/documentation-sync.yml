@@ -1,0 +1,246 @@
+name: "Documentation Sync"
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '**.go'
+      - '**.js'
+      - '**.ts'
+      - '**.py'
+      - '**.java'
+      - '**.cs'
+      - '**.rs'
+      - '**.rb'
+      - '**.md'
+      - '!README.md'
+      - '!.github/**'
+  pull_request:
+    types: [closed]
+    paths:
+      - '**.go'
+      - '**.js'
+      - '**.ts'
+      - '**.py'
+      - '**.java'
+      - '**.cs'
+      - '**.rs'
+      - '**.rb'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  sync-readme:
+    name: "Sync README with Code"
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Analyze code changes
+        run: |
+          # Get files changed in the PR
+          git diff --name-only origin/main...HEAD > changed-files.txt || git diff --name-only origin/master...HEAD > changed-files.txt
+          cat changed-files.txt
+
+      - name: Run Documentation Sync
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            You are a technical documentation expert. Analyze the code changes and update the README.md.
+            
+            ## Changed Files
+            ${{ steps.analyze.outputs.files }}
+            
+            ## Your Task
+            1. Read the current README.md
+            2. Analyze the code changes
+            3. Update the README if:
+               - New features were added (update feature list)
+               - New APIs or interfaces were added (document them)
+               - Dependencies changed (update requirements)
+               - Configuration changed (update setup section)
+               - Usage patterns changed (update examples)
+            4. Keep the README concise and up-to-date
+            
+            ## Important
+            - Only update the README if changes are necessary
+            - Preserve existing README structure and style
+            - Add code examples where appropriate
+            - Mark new features clearly
+            
+            If no changes are needed to the README, say so clearly.
+          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.4}}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Create PR with documentation updates
+        if: steps.gemini.outputs.summary != 'No changes needed'
+        run: |
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No README changes needed"
+          else
+            git config user.name "Gemini CLI"
+            git config user.email "gemini-cli@github-actions[bot].com"
+            
+            git checkout -b docs/update-from-pr-${{ github.event.pull_request.number }}
+            git add README.md
+            git commit -m "docs: update README from PR #${{ github.event.pull_request.number }}
+            
+            Automated documentation sync by Gemini CLI
+            PR: ${{ github.event.pull_request.title }}"
+            
+            gh pr create \
+              --title "docs: update README from PR #${{ github.event.pull_request.number }}" \
+              --body "This PR updates the README.md based on changes from PR #${{ github.event.pull_request.number }}
+
+Automated documentation sync by Gemini CLI" \
+              --base main
+          fi
+
+  generate-api-docs:
+    name: "Generate API Documentation"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect language
+        run: |
+          if [ -f "package.json" ]; then
+            echo "LANGUAGE=javascript" >> $GITHUB_ENV
+          elif [ -f "requirements.txt" ] || [ -f "setup.py" ]; then
+            echo "LANGUAGE=python" >> $GITHUB_ENV
+          elif [ -f "go.mod" ]; then
+            echo "LANGUAGE=go" >> $GITHUB_ENV
+          elif [ -f "Cargo.toml" ]; then
+            echo "LANGUAGE=rust" >> $GITHUB_ENV
+          else
+            echo "LANGUAGE=unknown" >> $GITHUB_ENV
+          fi
+          echo "Detected language: $LANGUAGE"
+
+      - name: Generate API Docs
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            You are a technical documentation expert. Generate comprehensive API documentation for this codebase.
+            
+            ## Project Language
+            ${{ env.LANGUAGE }}
+            
+            ## Your Task
+            1. Analyze the codebase structure
+            2. Identify all public APIs, functions, and interfaces
+            3. Generate clear documentation including:
+               - Function/method signatures
+               - Parameter descriptions
+               - Return values
+               - Usage examples
+               - Error handling
+            
+            4. Output in markdown format suitable for API documentation
+            
+            Be thorough and include practical examples.
+          settings: '{"model": "gemini-2.5-flash", "temperature": 0.3, "maxOutputTokens": 16384}}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Save documentation
+        run: |
+          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          echo "$SUMMARY" > API_DOCUMENTATION.md
+          
+          gh issue create \
+            --title "Generated API Documentation - $(date +'%Y-%m-%d')" \
+            --body "See attached API documentation generated by Gemini CLI.
+
+$SUMMARY" \
+            --label "documentation,automated"
+
+  changelog-generation:
+    name: "Generate Changelog"
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Analyze changes
+        run: |
+          git log --oneline -20 > commits.txt
+          cat commits.txt
+
+      - name: Generate changelog
+        uses: google-github-actions/run-gemini-cli@v0.1.21
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            Generate a changelog entry based on the recent commits and the merged PR.
+            
+            ## Recent Commits
+            ${{ steps.analyze.outputs.commits }}
+            
+            ## Merged PR
+            Number: ${{ github.event.pull_request.number }}
+            Title: ${{ github.event.pull_request.title }}
+            Description: ${{ github.event.pull_request.body }}
+            
+            ## Your Task
+            Generate a changelog entry in the Keep a Changelog format:
+            ```
+            ## [Unreleased]
+            
+            ### Added
+            - New features
+            
+            ### Changed
+            - Changes to existing functionality
+            
+            ### Fixed
+            - Bug fixes
+            
+            ### Deprecated
+            - Soon-to-be removed features
+            
+            ### Removed
+            - Removed features
+            
+            ### Security
+            - Security improvements
+            ```
+            
+            Categorize the changes appropriately.
+          settings: '{"model": "gemini-2.5-flash-lite", "temperature": 0.3}}'
+          gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
+
+      - name: Update changelog
+        if: always()
+        run: |
+          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          
+          if [ -f "CHANGELOG.md" ]; then
+            # Prepend to changelog
+            {
+              echo "# Changelog"
+              echo ""
+              echo "$SUMMARY"
+              echo ""
+              cat CHANGELOG.md
+            } > CHANGELOG.md.new
+            mv CHANGELOG.md.new CHANGELOG.md
+          fi
