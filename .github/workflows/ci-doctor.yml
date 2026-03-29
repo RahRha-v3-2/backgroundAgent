@@ -9,6 +9,8 @@ on:
       - master
       - develop
   workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *" # Run at 2 AM UTC
 
 permissions:
   contents: read
@@ -155,8 +157,7 @@ jobs:
   nightly-health-check:
     name: "Nightly CI Health Check"
     runs-on: ubuntu-latest
-    schedule:
-      - cron: "0 2 * * *" # Run at 2 AM UTC
+    if: github.event_name == 'schedule'
     steps:
       - name: Check recent workflow runs
         run: |
