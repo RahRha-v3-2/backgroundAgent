@@ -30,13 +30,18 @@ jobs:
           LIMIT="${{ github.event.inputs.limit || '10' }}"
           echo "limit=$LIMIT" >> $GITHUB_OUTPUT
           
-          gh issue list \
+          ISSUES=$(gh issue list \
             --state open \
             --limit "$LIMIT" \
             --json number,title,labels,createdAt \
-            --jq '.[] | "#\(.number): \(.title)\nLabels: \(.labels | map(.name) | join(", "))\nCreated: \(.createdAt)\n---"'
+            --jq '.[] | "#\(.number): \(.title)\nLabels: \(.labels | map(.name) | join(", "))\nCreated: \(.createdAt)\n---"')
+
+          echo "issues<<EOF" >> $GITHUB_OUTPUT
+          echo "$ISSUES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run Triage Analysis
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -59,13 +64,13 @@ jobs:
             - Issues that could be closed as duplicates or invalid
             
             Format your response clearly with sections for each category.
-          gemini_model: gemini-2.5-flash-lite
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create triage report
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           
           gh issue create \
             --title "Daily Triage Report - $(date +'%Y-%m-%d')" \

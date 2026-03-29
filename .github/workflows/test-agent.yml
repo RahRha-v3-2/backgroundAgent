@@ -28,7 +28,7 @@ jobs:
       - name: Test Gemini API
         run: |
           echo "Testing Gemini API..."
-          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+          RESPONSE=$(curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
             -H "Content-Type: application/json" \
             -d '{"contents":[{"parts":[{"text":"Confirm this is working. Reply with just OK."}]}]}')
           
@@ -49,6 +49,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Test Gemini CLI
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -59,7 +60,7 @@ jobs:
             3. A confirmation that you can read this repository
             
             Keep it under 100 words.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: true
 
       - name: Report Results
@@ -67,8 +68,8 @@ jobs:
           echo "## Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Gemini CLI Test" >> $GITHUB_STEP_SUMMARY
-          echo "Summary: ${{ steps.gemini-cli.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
-          echo "Error: ${{ steps.gemini-cli.outputs.error || 'None' }}" >> $GITHUB_STEP_SUMMARY
+          echo "Summary: ${{ steps.gemini.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+          echo "Error: ${{ steps.gemini.outputs.error || 'None' }}" >> $GITHUB_STEP_SUMMARY
           
           cat $GITHUB_STEP_SUMMARY
 
@@ -104,6 +105,7 @@ jobs:
           echo "Created test issue: $TEST_ISSUE"
 
       - name: Run Triage
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -123,11 +125,11 @@ jobs:
             - **Priority**: [answer]
             - **Components**: [answer]
             - **Labels**: [comma-separated]
-          gemini_model: gemini-2.5-flash-lite
+          gemini_model: gemini-1.5-flash-lite
 
       - name: Apply labels and close test issue
         run: |
-          SUMMARY="${{ steps.gemini-cli.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary }}"
           
           # Apply labels based on triage
           gh issue edit $TEST_ISSUE --add-label "priority: high,bug,authentication"
@@ -155,6 +157,7 @@ jobs:
           echo 'function calculateTotal(items, taxRate) { let total = 0; for (let i = 0; i < items.length; i++) { total += items[i].price; } total = total * (1 + taxRate); return total; } module.exports = { calculateTotal };' > test-dir/example.js
 
       - name: Run Review
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -178,17 +181,17 @@ jobs:
             ```
             
             Keep review brief - 3-5 bullet points max.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
 
       - name: Report Review
         run: |
           echo "## Code Review Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Review Output" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.gemini-cli.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.gemini.outputs.summary }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Error (if any)" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.gemini-cli.outputs.error || 'None' }}" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.gemini.outputs.error || 'None' }}" >> $GITHUB_STEP_SUMMARY
           
           cat $GITHUB_STEP_SUMMARY
           echo ""

@@ -55,9 +55,13 @@ jobs:
         id: logs
         run: |
           gh run view ${{ github.event.workflow_run.id }} --log-failed 2>/dev/null | head -500 > failed-logs.txt || echo "No logs available" > failed-logs.txt
+          echo "logs<<EOF" >> $GITHUB_OUTPUT
+          cat failed-logs.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           cat failed-logs.txt
 
       - name: Run Diagnosis
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -100,13 +104,13 @@ jobs:
             ```
             
             Be specific and actionable. Don't guess - if you can't determine the cause, say so.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create diagnostic issue
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           LOGS="${{ steps.logs.outputs.logs }}"
           
           # Create an issue with the diagnosis
@@ -138,7 +142,7 @@ jobs:
       - name: Add diagnostic comment to relevant PR
         if: ${{ github.event.workflow_run.event == 'pull_request' }}
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           PR_NUM="${{ github.event.workflow_run.pull_requests[0].number }}"
           
           if [ -n "$PR_NUM" ]; then
@@ -175,11 +179,14 @@ jobs:
             --jq '.[] | "- \(.name): \(.conclusion // .status) (started: \(.startedAt))"' 2>/dev/null || echo "No runs found")
           
           echo "$REPORT" >> health-report.md
-          echo "report=$REPORT" >> $GITHUB_OUTPUT
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           cat health-report.md
 
       - name: Analyze patterns
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -196,13 +203,13 @@ jobs:
             4. Flag any concerning patterns
             
             Keep it brief and actionable.
-          gemini_model: gemini-2.5-flash-lite
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post health report
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           
           gh issue create \
             --title "CI Health Report - $(date +'%Y-%m-%d')" \

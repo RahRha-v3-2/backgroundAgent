@@ -23,6 +23,7 @@ jobs:
     outputs:
       command: ${{ steps.parse.outputs.command }}
       target: ${{ steps.parse.outputs.target }}
+      comment: ${{ steps.parse.outputs.comment }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -32,14 +33,18 @@ jobs:
       - name: Parse command
         id: parse
         run: |
-          COMMENT="${{ github.event.comment.body || github.event.issue.body || github.event.pull_request_review_comment.body }}"
-          COMMENT_LOWER=$(echo "$COMMENT" | tr '[:upper:]' '[:lower:]')
+          RAW_COMMENT="${{ github.event.comment.body || github.event.issue.body || github.event.pull_request_review_comment.body }}"
+          COMMENT_LOWER=$(echo "$RAW_COMMENT" | tr '[:upper:]' '[:lower:]')
           
           if echo "$COMMENT_LOWER" | grep -q "@gemini-cli"; then
-            COMMENT=$(echo "$COMMENT" | sed 's/@gemini-cli//gi')
+            COMMENT=$(echo "$RAW_COMMENT" | sed 's/@gemini-cli//gi')
+          else
+            COMMENT="$RAW_COMMENT"
           fi
           
-          echo "comment=$COMMENT" >> $GITHUB_OUTPUT
+          echo "comment<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           
           if echo "$COMMENT" | grep -q "/implement\|/fix\|/build\|/create"; then
             echo "command=implement" >> $GITHUB_OUTPUT
@@ -94,13 +99,14 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gemini CLI
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           prompt: |
             You are a helpful coding assistant for this repository. 
             
-            ${{ github.event.comment.body || github.event.issue.body }}
+            ${{ needs.dispatch.outputs.comment }}
             
             Repository context:
             - Owner: ${{ github.repository_owner }}
@@ -112,7 +118,7 @@ jobs:
             If this is a code explanation request, analyze the relevant files and provide a clear explanation.
             
             Respond concisely but thoroughly.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post response
@@ -139,6 +145,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Self-Coding Agent
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -167,7 +174,7 @@ jobs:
             - Update documentation if needed
             
             If you cannot complete the implementation, create a detailed analysis of what needs to be done.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Update issue status
@@ -187,6 +194,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Triage Agent
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -215,13 +223,13 @@ jobs:
             - **Suggested Labels**: [comma-separated labels]
             - **Notes**: [any additional observations]
             ```
-          gemini_model: gemini-2.5-flash-lite
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Apply triage results
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           
           # Extract labels from response and apply them
           if echo "$SUMMARY" | grep -qi "bug"; then
@@ -258,6 +266,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Code Review Agent
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -295,13 +304,13 @@ jobs:
             ```
             
             Be thorough but constructive. Focus on important issues.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post review
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
           
           # Post as PR review
@@ -325,6 +334,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Documentation Agent
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -347,7 +357,7 @@ jobs:
             - Update related files (changelog, API docs, etc.)
             
             If changes are needed, create a branch and PR with the documentation updates.
-          gemini_model: gemini-2.5-flash-lite
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Notify completion
@@ -373,6 +383,7 @@ jobs:
           gh run list --workflow="*" --status=failure --limit 5 --json name,status,conclusion,headBranch,url
 
       - name: Run Debug Agent
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -393,13 +404,13 @@ jobs:
             5. Suggest a fix with code if applicable
             
             Be specific and actionable in your diagnosis.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post diagnosis
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           ISSUE_NUM="${{ github.event.issue.number }}"
           
           gh issue comment $ISSUE_NUM --body "CI Diagnosis: $SUMMARY - Automated by Gemini CLI"

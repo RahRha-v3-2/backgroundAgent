@@ -22,6 +22,11 @@ jobs:
   validate:
     name: "Validate Workflows"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: read
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +44,14 @@ jobs:
 
   test-gh-cli:
     name: "Test GH CLI"
+    env:
+      GH_TOKEN: ${{ github.token }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: read
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +63,11 @@ jobs:
   docker-build-test:
     name: "Test Docker Build"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: read
     steps:
       - uses: actions/checkout@v4
 
