@@ -41,6 +41,7 @@ jobs:
           # This is a simplified check - a real implementation might use CPD or similar
 
       - name: Run Simplification Analysis
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -76,13 +77,13 @@ jobs:
             ```
             
             Focus on impactful changes that improve maintainability.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Create improvement report
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           cat > /tmp/improvement_report.md << 'EOF'
           ## Weekly Code Simplification Analysis
 
@@ -107,6 +108,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Coverage Analysis
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -136,13 +138,13 @@ jobs:
             ```
             
             Be specific about what should be tested and why.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post recommendations
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           cat > /tmp/coverage_report.md << 'EOF'
           ## Test Coverage Analysis
 
@@ -184,6 +186,7 @@ jobs:
           cat dependencies.txt
 
       - name: Analyze dependencies
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -214,13 +217,13 @@ jobs:
             ### Optimization Opportunities
             [Heavy or unnecessary dependencies]
             ```
-          gemini_model: gemini-2.5-flash-lite
+          gemini_model: gemini-1.5-flash-lite
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post dependency report
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           cat > /tmp/deps_report.md << 'EOF'
           ## Dependency Analysis
 

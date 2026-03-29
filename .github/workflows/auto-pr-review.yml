@@ -49,6 +49,7 @@ jobs:
           cat changed-files.txt
 
       - name: Run Code Review
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -99,13 +100,13 @@ jobs:
             ```
             
             Be specific and constructive. Focus on important issues, not style preferences.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post review comment
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           PR_NUM="${{ github.event.pull_request.number }}"
           
           # Format the review body with proper escaping
@@ -144,6 +145,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Security Analysis
+        id: gemini
         uses: google-github-actions/run-gemini-cli@v0.1.21
         with:
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
@@ -181,13 +183,13 @@ jobs:
             ```
             
             Be thorough but concise. Only report actual security concerns.
-          gemini_model: gemini-2.5-flash
+          gemini_model: gemini-1.5-flash
           gemini_debug: ${{ vars.GEMINI_DEBUG == 'true' }}
 
       - name: Post security findings
         if: always()
         run: |
-          SUMMARY="${{ steps.gemini.outputs.summary }}"
+          SUMMARY="${{ steps.gemini.outputs.summary || steps.gemini.outputs.error || 'An error occurred during agent execution.' }}"
           PR_NUM="${{ github.event.pull_request.number }}"
           
           if echo "$SUMMARY" | grep -qi "critical\|high"; then
