@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   validate:
@@ -45,7 +46,7 @@ jobs:
       - name: Test GH CLI
         run: |
           gh --version
-          gh auth status
+          gh api user --jq '.login'
 
   docker-build-test:
     name: "Test Docker Build"
