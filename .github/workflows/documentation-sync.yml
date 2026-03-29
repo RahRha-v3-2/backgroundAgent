@@ -101,8 +101,8 @@ jobs:
             git push -u origin docs/update-from-pr-$PR_NUM
             
             gh pr create \
-              --title "docs: update README from PR #$PR_NUM" \
-              --body "This PR updates the README.md based on changes from PR #$PR_NUM. Automated documentation sync by Gemini CLI." \
+              --title "docs: update README from PR $PR_NUM" \
+              --body "This PR updates the README.md based on changes from PR $PR_NUM. Automated documentation sync by Gemini CLI." \
               --base main
           fi
 
